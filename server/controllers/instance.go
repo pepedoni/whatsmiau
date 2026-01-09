@@ -93,6 +93,7 @@ func (s *Instance) Update(ctx echo.Context) error {
 			Base64: &[]bool{request.Webhook.Base64}[0],
 			Events: request.Webhook.Events,
 		},
+		InstanceProxy: request.InstanceProxy,
 	})
 	if err != nil {
 		if errors.Is(err, instances.ErrorNotFound) {

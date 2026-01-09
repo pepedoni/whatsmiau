@@ -19,6 +19,7 @@ type UpdateInstanceRequest struct {
 		URL    string   `json:"url,omitempty"`
 		Events []string `json:"events,omitempty"`
 	} `json:"webhook,omitempty"`
+	models.InstanceProxy
 }
 
 type UpdateInstanceResponse struct {
