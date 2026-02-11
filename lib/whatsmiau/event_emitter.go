@@ -9,10 +9,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/emersion/go-vcard"
 	"github.com/google/uuid"
+	"github.com/verbeux-ai/whatsmiau/env"
 	"github.com/verbeux-ai/whatsmiau/models"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -77,34 +79,54 @@ func (s *Whatsmiau) getInstanceCached(id string) *models.Instance {
 }
 
 func (s *Whatsmiau) startEmitter() {
-	for event := range s.emitter {
-		data, err := json.Marshal(event.data)
-		if err != nil {
-			zap.L().Error("failed to marshal event", zap.Error(err))
-			return
-		}
+	workers := env.Env.EmitterWorkers
+	if workers <= 0 {
+		workers = 50
+	}
 
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, event.url, bytes.NewReader(data))
-		if err != nil {
-			zap.L().Error("failed to create request", zap.Error(err))
-			return
-		}
-
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := s.httpClient.Do(req)
-		if err != nil {
-			zap.L().Error("failed to send request", zap.Error(err))
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			res, err := io.ReadAll(resp.Body)
-			if err != nil {
-				zap.L().Error("failed to read response body", zap.Error(err))
-			} else {
-				zap.L().Error("error doing request", zap.Any("response", string(res)), zap.String("url", event.url))
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for event := range s.emitter {
+				s.processEmit(event)
 			}
+		}()
+	}
+	wg.Wait()
+}
+
+func (s *Whatsmiau) processEmit(event emitter) {
+	data, err := json.Marshal(event.data)
+	if err != nil {
+		zap.L().Error("failed to marshal event", zap.Error(err))
+		return
+	}
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, event.url, bytes.NewReader(data))
+	if err != nil {
+		zap.L().Error("failed to create request", zap.Error(err))
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		zap.L().Error("failed to send request", zap.Error(err))
+		return
+	}
+	defer func() {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		res, err := io.ReadAll(resp.Body)
+		if err != nil {
+			zap.L().Error("failed to read response body", zap.Error(err))
+		} else {
+			zap.L().Error("error doing request", zap.Any("response", string(res)), zap.String("url", event.url))
 		}
 	}
 }
