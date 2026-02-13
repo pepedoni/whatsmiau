@@ -608,12 +608,20 @@ func (s *Whatsmiau) convertContactHistorySync(id string, event []*waHistorySync.
 			continue
 		}
 
-		url, _, err := s.getPic(id, jid)
+		url, b64Pic, err := s.getPic(id, jid)
 		if err != nil {
 			zap.L().Error("failed to get pic", zap.Error(err))
 		}
 
+		picUrl, err := s.uploadPic(context.Background(), jid.ToNonAD().String(), b64Pic)
+		if err != nil {
+			zap.L().Error("failed to upload pic", zap.Error(err))
+		} else {
+			url = picUrl
+		}
+
 		c.ProfilePicUrl = url
+		c.Base64Pic = b64Pic
 		result = append(result, c)
 	}
 
@@ -822,8 +830,29 @@ func (s *Whatsmiau) uploadMessageFile(ctx context.Context, instance *models.Inst
 	return urlResult, b64Result
 }
 
+func (s *Whatsmiau) uploadPic(ctx context.Context, waId, b64Data string) (string, error) {
+	if s.fileStorage == nil {
+		return "", nil
+	}
+
+	mimetype, ext, _, err := extractFromBase64(b64Data)
+	if err != nil {
+		return "", err
+	}
+
+	waIdTreated := strings.Split(waId, "@")
+
+	urlResult, err := s.fileStorage.UploadBase64IfDontExists(ctx, waIdTreated[0]+"."+ext, mimetype, b64Data)
+	if err != nil {
+		zap.L().Error("failed to upload image", zap.Error(err))
+		return "", err
+	}
+
+	return urlResult, nil
+}
+
 func (s *Whatsmiau) convertContact(id string, evt *events.Contact) *WookContact {
-	url, _, err := s.getPic(id, evt.JID)
+	url, b64Pic, err := s.getPic(id, evt.JID)
 	if err != nil {
 		zap.L().Error("failed to get pic", zap.Error(err))
 	}
@@ -843,6 +872,13 @@ func (s *Whatsmiau) convertContact(id string, evt *events.Contact) *WookContact 
 		return nil
 	}
 
+	picUrl, err := s.uploadPic(context.Background(), evt.JID.ToNonAD().String(), b64Pic)
+	if err != nil {
+		zap.L().Error("failed to upload pic", zap.Error(err))
+	} else {
+		url = picUrl
+	}
+
 	jid, lid := s.GetJidLid(context.Background(), id, evt.JID)
 	return &WookContact{
 		RemoteJid:     jid,
@@ -850,11 +886,12 @@ func (s *Whatsmiau) convertContact(id string, evt *events.Contact) *WookContact 
 		PushName:      name,
 		ProfilePicUrl: url,
 		InstanceId:    id,
+		Base64Pic:     b64Pic,
 	}
 }
 
 func (s *Whatsmiau) convertGroupInfo(id string, evt *events.GroupInfo) *WookContact {
-	url, _, err := s.getPic(id, evt.JID)
+	url, b64Pic, err := s.getPic(id, evt.JID)
 	if err != nil {
 		zap.L().Error("failed to get pic", zap.Error(err))
 	}
@@ -867,6 +904,13 @@ func (s *Whatsmiau) convertGroupInfo(id string, evt *events.GroupInfo) *WookCont
 		return nil
 	}
 
+	picUrl, err := s.uploadPic(context.Background(), evt.JID.ToNonAD().String(), b64Pic)
+	if err != nil {
+		zap.L().Error("failed to upload pic", zap.Error(err))
+	} else {
+		url = picUrl
+	}
+
 	jid, lid := s.GetJidLid(context.Background(), id, evt.JID)
 
 	return &WookContact{
@@ -875,11 +919,12 @@ func (s *Whatsmiau) convertGroupInfo(id string, evt *events.GroupInfo) *WookCont
 		ProfilePicUrl: url,
 		InstanceId:    id,
 		RemoteLid:     lid,
+		Base64Pic:     b64Pic,
 	}
 }
 
 func (s *Whatsmiau) convertPushName(id string, evt *events.PushName) *WookContact {
-	url, _, err := s.getPic(id, evt.JID)
+	url, b64Pic, err := s.getPic(id, evt.JID)
 	if err != nil {
 		zap.L().Error("failed to get pic", zap.Error(err))
 	}
@@ -897,6 +942,13 @@ func (s *Whatsmiau) convertPushName(id string, evt *events.PushName) *WookContac
 		return nil
 	}
 
+	picUrl, err := s.uploadPic(context.Background(), evt.JID.ToNonAD().String(), b64Pic)
+	if err != nil {
+		zap.L().Error("failed to upload pic", zap.Error(err))
+	} else {
+		url = picUrl
+	}
+
 	jid, lid := s.GetJidLid(context.Background(), id, evt.JID)
 
 	return &WookContact{
@@ -905,11 +957,12 @@ func (s *Whatsmiau) convertPushName(id string, evt *events.PushName) *WookContac
 		InstanceId:    id,
 		ProfilePicUrl: url,
 		RemoteLid:     lid,
+		Base64Pic:     b64Pic,
 	}
 }
 
 func (s *Whatsmiau) convertPicture(id string, evt *events.Picture) *WookContact {
-	url, b64, err := s.getPic(id, evt.JID)
+	url, b64Pic, err := s.getPic(id, evt.JID)
 	if err != nil {
 		zap.L().Error("failed to get pic", zap.Error(err))
 	}
@@ -918,19 +971,26 @@ func (s *Whatsmiau) convertPicture(id string, evt *events.Picture) *WookContact 
 		return nil
 	}
 
+	picUrl, err := s.uploadPic(context.Background(), evt.JID.ToNonAD().String(), b64Pic)
+	if err != nil {
+		zap.L().Error("failed to upload pic", zap.Error(err))
+	} else {
+		url = picUrl
+	}
+
 	jid, lid := s.GetJidLid(context.Background(), id, evt.JID)
 
 	return &WookContact{
 		RemoteJid:     jid,
 		InstanceId:    id,
-		Base64Pic:     b64,
+		Base64Pic:     b64Pic,
 		ProfilePicUrl: url,
 		RemoteLid:     lid,
 	}
 }
 
 func (s *Whatsmiau) convertBusinessName(id string, evt *events.BusinessName) *WookContact {
-	url, b64, err := s.getPic(id, evt.JID)
+	url, b64Pic, err := s.getPic(id, evt.JID)
 	if err != nil {
 		zap.L().Error("failed to get pic", zap.Error(err))
 	}
@@ -950,12 +1010,19 @@ func (s *Whatsmiau) convertBusinessName(id string, evt *events.BusinessName) *Wo
 		return nil
 	}
 
+	picUrl, err := s.uploadPic(context.Background(), evt.JID.ToNonAD().String(), b64Pic)
+	if err != nil {
+		zap.L().Error("failed to upload pic", zap.Error(err))
+	} else {
+		url = picUrl
+	}
+
 	jid, lid := s.GetJidLid(context.Background(), id, evt.JID)
 
 	return &WookContact{
 		RemoteJid:     jid,
 		InstanceId:    id,
-		Base64Pic:     b64,
+		Base64Pic:     b64Pic,
 		ProfilePicUrl: url,
 		PushName:      name,
 		RemoteLid:     lid,
