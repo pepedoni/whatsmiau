@@ -152,6 +152,11 @@ func (s *Whatsmiau) Handle(id string) whatsmeow.EventHandler {
 			switch e := evt.(type) {
 			case *events.LoggedOut:
 				s.handleLoggedOut(id)
+			case *events.Disconnected:
+				_ = e
+				if s.webshare != nil && s.webshare.Enabled() {
+					go s.handleUnexpectedDisconnect(id)
+				}
 			case *events.Message:
 				s.handleMessageEvent(id, instance, e, eventMap)
 			case *events.Receipt:

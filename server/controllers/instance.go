@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"math/rand/v2"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/verbeux-ai/whatsmiau/lib/whatsmiau"
 	"github.com/verbeux-ai/whatsmiau/models"
 	"github.com/verbeux-ai/whatsmiau/repositories/instances"
+	"github.com/verbeux-ai/whatsmiau/services"
 	"go.mau.fi/whatsmeow/types"
 
 	"github.com/go-playground/validator/v10"
@@ -24,12 +26,14 @@ import (
 type Instance struct {
 	repo      interfaces.InstanceRepository
 	whatsmiau *whatsmiau.Whatsmiau
+	webshare  *services.WebshareService
 }
 
-func NewInstances(repository interfaces.InstanceRepository, whatsmiau *whatsmiau.Whatsmiau) *Instance {
+func NewInstances(repository interfaces.InstanceRepository, whatsmiau *whatsmiau.Whatsmiau, webshare *services.WebshareService) *Instance {
 	return &Instance{
 		repo:      repository,
 		whatsmiau: whatsmiau,
+		webshare:  webshare,
 	}
 }
 
@@ -53,15 +57,43 @@ func (s *Instance) Create(ctx echo.Context) error {
 	}
 	request.RemoteJID = ""
 
-	if len(request.ProxyHost) <= 0 && len(env.Env.ProxyAddresses) > 0 {
-		rd := rand.IntN(len(env.Env.ProxyAddresses))
-		proxyUrl := env.Env.ProxyAddresses[rd]
+	if len(request.ProxyHost) <= 0 {
+		if s.webshare != nil && s.webshare.Enabled() {
+			c := ctx.Request().Context()
+			all, err := s.repo.List(c, "")
+			if err != nil {
+				zap.L().Error("failed to list instances for proxy assignment", zap.Error(err))
+			} else {
+				var usedIDs []string
+				for _, inst := range all {
+					if inst.WebshareProxyID != "" {
+						usedIDs = append(usedIDs, inst.WebshareProxyID)
+					}
+				}
+				proxy, err := s.webshare.GetAvailableProxy(usedIDs)
+				if err != nil {
+					zap.L().Error("failed to get webshare proxy", zap.Error(err))
+				} else if proxy != nil {
+					request.InstanceProxy = models.InstanceProxy{
+						WebshareProxyID: proxy.ID,
+						ProxyHost:       proxy.ProxyAddress,
+						ProxyPort:       fmt.Sprintf("%d", proxy.Port),
+						ProxyProtocol:   "HTTP",
+						ProxyUsername:   proxy.Username,
+						ProxyPassword:   proxy.Password,
+					}
+				}
+			}
+		} else if len(env.Env.ProxyAddresses) > 0 {
+			rd := rand.IntN(len(env.Env.ProxyAddresses))
+			proxyUrl := env.Env.ProxyAddresses[rd]
 
-		proxy, err := parseProxyURL(proxyUrl)
-		if err != nil {
-			return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "invalid proxy url on env")
+			proxy, err := parseProxyURL(proxyUrl)
+			if err != nil {
+				return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "invalid proxy url on env")
+			}
+			request.InstanceProxy = *proxy
 		}
-		request.InstanceProxy = *proxy
 	}
 
 	c := ctx.Request().Context()
@@ -312,4 +344,18 @@ func (s *Instance) Delete(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, dto.DeleteInstanceResponse{
 		Message: "instance deleted",
 	})
+}
+
+func (s *Instance) RotateProxy(ctx echo.Context) error {
+	id := ctx.Param("id")
+	if id == "" {
+		return utils.HTTPFail(ctx, http.StatusBadRequest, fmt.Errorf("missing id"), "instance id is required")
+	}
+
+	if err := s.whatsmiau.RotateProxy(id); err != nil {
+		zap.L().Error("failed to rotate proxy", zap.String("instance", id), zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to rotate proxy")
+	}
+
+	return ctx.JSON(http.StatusOK, map[string]string{"message": "proxy rotated successfully"})
 }

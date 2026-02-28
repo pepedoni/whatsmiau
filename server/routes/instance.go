@@ -2,6 +2,7 @@ package routes
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/verbeux-ai/whatsmiau/env"
 	"github.com/verbeux-ai/whatsmiau/lib/whatsmiau"
 	"github.com/verbeux-ai/whatsmiau/repositories/instances"
 	"github.com/verbeux-ai/whatsmiau/server/controllers"
@@ -10,14 +11,18 @@ import (
 
 func Instance(group *echo.Group) {
 	redisInstance := instances.NewRedis(services.Redis())
+	webshare := services.NewWebshareService(env.Env.WebshareAPIKey)
 
-	controller := controllers.NewInstances(redisInstance, whatsmiau.Get())
+	controller := controllers.NewInstances(redisInstance, whatsmiau.Get(), webshare)
+	whatsmiau.Get().SetWebshareService(webshare)
+
 	group.POST("", controller.Create)
 	group.GET("", controller.List)
 	group.POST("/:id/connect", controller.Connect)
 	group.POST("/:id/logout", controller.Logout)
 	group.DELETE("/:id", controller.Delete)
 	group.GET("/:id/status", controller.Status)
+	group.POST("/:id/rotate-proxy", controller.RotateProxy)
 
 	// Evolution API Compatibility (partially REST)
 	group.POST("/create", controller.Create)

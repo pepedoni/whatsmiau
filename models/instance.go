@@ -16,11 +16,12 @@ type Instance struct {
 }
 
 type InstanceProxy struct {
-	ProxyHost     string `json:"proxyHost,omitempty"`
-	ProxyPort     string `json:"proxyPort,omitempty"`
-	ProxyProtocol string `json:"proxyProtocol,omitempty"`
-	ProxyUsername string `json:"proxyUsername,omitempty"`
-	ProxyPassword string `json:"proxyPassword,omitempty"`
+	WebshareProxyID string `json:"webshareProxyId,omitempty"`
+	ProxyHost       string `json:"proxyHost,omitempty"`
+	ProxyPort       string `json:"proxyPort,omitempty"`
+	ProxyProtocol   string `json:"proxyProtocol,omitempty"`
+	ProxyUsername   string `json:"proxyUsername,omitempty"`
+	ProxyPassword   string `json:"proxyPassword,omitempty"`
 }
 
 type InstanceWebhook struct {

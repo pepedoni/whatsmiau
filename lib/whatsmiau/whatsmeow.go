@@ -1,6 +1,7 @@
 package whatsmiau
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -34,6 +35,8 @@ type Whatsmiau struct {
 	httpClient       *http.Client
 	fileStorage      interfaces.Storage
 	handlerSemaphore chan struct{}
+	webshare         *services.WebshareService
+	lastRotateAt     *xsync.Map[string, time.Time]
 }
 
 var instance *Whatsmiau
@@ -126,6 +129,7 @@ func LoadMiau(ctx context.Context, container *sqlstore.Container) {
 		},
 		fileStorage:      storage,
 		handlerSemaphore: make(chan struct{}, env.Env.HandlerSemaphoreSize),
+		lastRotateAt:     xsync.NewMap[string, time.Time](),
 	}
 
 	go instance.startEmitter()
@@ -400,6 +404,102 @@ func (s *Whatsmiau) GetJidLid(ctx context.Context, id string, jid types.JID) (st
 	}
 
 	return newJid, newLid
+}
+
+func (s *Whatsmiau) SetWebshareService(ws *services.WebshareService) {
+	s.webshare = ws
+}
+
+// rotateProxy fetches a new Webshare proxy for the given instance and applies it.
+func (s *Whatsmiau) rotateProxy(id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	all, err := s.repo.List(ctx, "")
+	if err != nil {
+		return fmt.Errorf("rotate proxy: list instances: %w", err)
+	}
+
+	var usedIDs []string
+	for _, inst := range all {
+		if inst.ID != id && inst.WebshareProxyID != "" {
+			usedIDs = append(usedIDs, inst.WebshareProxyID)
+		}
+	}
+
+	proxy, err := s.webshare.GetAvailableProxy(usedIDs)
+	if err != nil {
+		return fmt.Errorf("rotate proxy: get available proxy: %w", err)
+	}
+	if proxy == nil {
+		return fmt.Errorf("rotate proxy: no valid proxy available")
+	}
+
+	newProxy := models.InstanceProxy{
+		WebshareProxyID: proxy.ID,
+		ProxyHost:       proxy.ProxyAddress,
+		ProxyPort:       fmt.Sprintf("%d", proxy.Port),
+		ProxyProtocol:   "HTTP",
+		ProxyUsername:   proxy.Username,
+		ProxyPassword:   proxy.Password,
+	}
+
+	if _, err := s.repo.Update(ctx, id, &models.Instance{InstanceProxy: newProxy}); err != nil {
+		return fmt.Errorf("rotate proxy: update instance: %w", err)
+	}
+
+	s.instanceCache.Delete(id)
+
+	client, ok := s.clients.Load(id)
+	if ok {
+		configProxy(client, newProxy)
+	}
+
+	zap.L().Info("proxy rotated", zap.String("instance", id), zap.String("proxy_id", proxy.ID))
+	return nil
+}
+
+// handleUnexpectedDisconnect rotates the proxy and reconnects the instance.
+// A cooldown of 30s per instance prevents reconnect loops.
+func (s *Whatsmiau) handleUnexpectedDisconnect(id string) {
+	const cooldown = 30 * time.Second
+
+	if last, ok := s.lastRotateAt.Load(id); ok && time.Since(last) < cooldown {
+		zap.L().Debug("proxy rotation skipped (cooldown)", zap.String("instance", id))
+		return
+	}
+
+	inst := s.getInstance(id)
+	if inst == nil || inst.WebshareProxyID == "" {
+		return
+	}
+
+	zap.L().Warn("unexpected disconnect, rotating proxy", zap.String("instance", id))
+	s.lastRotateAt.Store(id, time.Now())
+
+	if err := s.rotateProxy(id); err != nil {
+		zap.L().Error("failed to rotate proxy on disconnect", zap.String("instance", id), zap.Error(err))
+		return
+	}
+
+	time.Sleep(2 * time.Second)
+
+	client, ok := s.clients.Load(id)
+	if !ok {
+		return
+	}
+
+	if err := client.Connect(); err != nil {
+		zap.L().Error("failed to reconnect after proxy rotation", zap.String("instance", id), zap.Error(err))
+	}
+}
+
+// RotateProxy rotates the Webshare proxy for the given instance (public, for controller use).
+func (s *Whatsmiau) RotateProxy(id string) error {
+	if s.webshare == nil || !s.webshare.Enabled() {
+		return fmt.Errorf("webshare is not configured")
+	}
+	return s.rotateProxy(id)
 }
 
 func (s *Whatsmiau) extractJidLid(ctx context.Context, id string, jid types.JID) (string, string) {
