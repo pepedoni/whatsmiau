@@ -32,6 +32,13 @@ func (s *Whatsmiau) SendText(ctx context.Context, data *SendText) (*SendTextResp
 		return nil, whatsmeow.ErrClientIsNil
 	}
 
+	if data.RemoteJID == nil {
+		return nil, fmt.Errorf("remote_jid is required")
+	}
+
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+	data.RemoteJID = &resolved
+
 	//rJid := data.RemoteJID.ToNonAD().String()
 	var extendedMessage *waE2E.ExtendedTextMessage
 	if len(data.QuoteMessage) > 0 && len(data.QuoteMessageID) > 0 {
@@ -88,6 +95,10 @@ func (s *Whatsmiau) SendAudio(ctx context.Context, data *SendAudioRequest) (*Sen
 		return nil, whatsmeow.ErrClientIsNil
 	}
 
+	if data.RemoteJID == nil {
+		return nil, fmt.Errorf("remote_jid is required")
+	}
+
 	resAudio, err := s.getCtx(ctx, data.AudioURL)
 	if err != nil {
 		return nil, err
@@ -120,6 +131,9 @@ func (s *Whatsmiau) SendAudio(ctx context.Context, data *SendAudioRequest) (*Sen
 		DirectPath:    proto.String(uploaded.DirectPath),
 		Waveform:      waveForm,
 	}
+
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+	data.RemoteJID = &resolved
 
 	res, err := client.SendMessage(ctx, *data.RemoteJID, &waE2E.Message{
 		AudioMessage: &audio,
@@ -154,6 +168,10 @@ func (s *Whatsmiau) SendDocument(ctx context.Context, data *SendDocumentRequest)
 		return nil, whatsmeow.ErrClientIsNil
 	}
 
+	if data.RemoteJID == nil {
+		return nil, fmt.Errorf("remote_jid is required")
+	}
+
 	resMedia, err := s.getCtx(ctx, data.MediaURL)
 	if err != nil {
 		return nil, err
@@ -180,6 +198,9 @@ func (s *Whatsmiau) SendDocument(ctx context.Context, data *SendDocumentRequest)
 		DirectPath:    proto.String(uploaded.DirectPath),
 		Caption:       proto.String(data.Caption),
 	}
+
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+	data.RemoteJID = &resolved
 
 	res, err := client.SendMessage(ctx, *data.RemoteJID, &waE2E.Message{
 		DocumentMessage: &doc,
@@ -212,6 +233,10 @@ func (s *Whatsmiau) SendImage(ctx context.Context, data *SendImageRequest) (*Sen
 		return nil, whatsmeow.ErrClientIsNil
 	}
 
+	if data.RemoteJID == nil {
+		return nil, fmt.Errorf("remote_jid is required")
+	}
+
 	resMedia, err := s.getCtx(ctx, data.MediaURL)
 	if err != nil {
 		return nil, err
@@ -241,6 +266,9 @@ func (s *Whatsmiau) SendImage(ctx context.Context, data *SendImageRequest) (*Sen
 		FileEncSHA256: uploaded.FileEncSHA256,
 		DirectPath:    proto.String(uploaded.DirectPath),
 	}
+
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+	data.RemoteJID = &resolved
 
 	res, err := client.SendMessage(ctx, *data.RemoteJID, &waE2E.Message{
 		ImageMessage: &doc,
@@ -274,6 +302,10 @@ func (s *Whatsmiau) SendReaction(ctx context.Context, data *SendReactionRequest)
 		return nil, whatsmeow.ErrClientIsNil
 	}
 
+	if data.RemoteJID == nil {
+		return nil, fmt.Errorf("remote_jid is required")
+	}
+
 	if len(data.Reaction) <= 0 {
 		return nil, fmt.Errorf("empty reaction, len: %d", len(data.Reaction))
 	}
@@ -285,6 +317,9 @@ func (s *Whatsmiau) SendReaction(ctx context.Context, data *SendReactionRequest)
 	if client.Store == nil || client.Store.ID == nil {
 		return nil, fmt.Errorf("device is not connected")
 	}
+
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+	data.RemoteJID = &resolved
 
 	sender := data.RemoteJID
 	if data.FromMe {
