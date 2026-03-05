@@ -32,6 +32,9 @@ func (s *Whatsmiau) SendText(ctx context.Context, data *SendText) (*SendTextResp
 		return nil, whatsmeow.ErrClientIsNil
 	}
 
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+	data.RemoteJID = &resolved
+
 	//rJid := data.RemoteJID.ToNonAD().String()
 	var extendedMessage *waE2E.ExtendedTextMessage
 	if len(data.QuoteMessage) > 0 && len(data.QuoteMessageID) > 0 {
@@ -121,6 +124,9 @@ func (s *Whatsmiau) SendAudio(ctx context.Context, data *SendAudioRequest) (*Sen
 		Waveform:      waveForm,
 	}
 
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+	data.RemoteJID = &resolved
+
 	res, err := client.SendMessage(ctx, *data.RemoteJID, &waE2E.Message{
 		AudioMessage: &audio,
 	})
@@ -180,6 +186,9 @@ func (s *Whatsmiau) SendDocument(ctx context.Context, data *SendDocumentRequest)
 		DirectPath:    proto.String(uploaded.DirectPath),
 		Caption:       proto.String(data.Caption),
 	}
+
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+	data.RemoteJID = &resolved
 
 	res, err := client.SendMessage(ctx, *data.RemoteJID, &waE2E.Message{
 		DocumentMessage: &doc,
@@ -242,6 +251,9 @@ func (s *Whatsmiau) SendImage(ctx context.Context, data *SendImageRequest) (*Sen
 		DirectPath:    proto.String(uploaded.DirectPath),
 	}
 
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+	data.RemoteJID = &resolved
+
 	res, err := client.SendMessage(ctx, *data.RemoteJID, &waE2E.Message{
 		ImageMessage: &doc,
 	})
@@ -285,6 +297,9 @@ func (s *Whatsmiau) SendReaction(ctx context.Context, data *SendReactionRequest)
 	if client.Store == nil || client.Store.ID == nil {
 		return nil, fmt.Errorf("device is not connected")
 	}
+
+	resolved := s.resolveJID(ctx, client, *data.RemoteJID)
+	data.RemoteJID = &resolved
 
 	sender := data.RemoteJID
 	if data.FromMe {

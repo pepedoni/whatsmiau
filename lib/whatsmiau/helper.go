@@ -367,3 +367,22 @@ func configProxy(client *whatsmeow.Client, instanceProxy models.InstanceProxy) {
 func mountProxyUrl(proxy models.InstanceProxy) string {
 	return fmt.Sprintf("%s://%s:%s@%s:%s", proxy.ProxyProtocol, proxy.ProxyUsername, proxy.ProxyPassword, proxy.ProxyHost, proxy.ProxyPort)
 }
+
+// Adding or removing the 9th digit. Returns empty if not applicable.
+func buildBrazilianAlternate(number string) string {
+	if !strings.HasPrefix(number, "55") || len(number) < 12 || len(number) > 13 {
+		return ""
+	}
+
+	ddd := number[2:4]
+	local := number[4:]
+
+	switch {
+	case len(local) == 9 && local[0] == '9':
+		return "55" + ddd + local[1:]
+	case len(local) == 8:
+		return "55" + ddd + "9" + local
+	default:
+		return ""
+	}
+}
