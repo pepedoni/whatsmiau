@@ -1,7 +1,7 @@
 package dto
 
 type SendTextRequest struct {
-	InstanceID       string                `param:"instance" validate:"required"`
+	InstanceID       string                `param:"instance" validate:"required" swaggerignore:"true"`
 	Number           string                `json:"number,omitempty" validate:"required"` // JID
 	Text             string                `json:"text,omitempty" validate:"required"`
 	Delay            int                   `json:"delay,omitempty" validate:"omitempty,min=0,max=300000"`
@@ -57,7 +57,7 @@ type ContextInfoQuotedMessage struct {
 }
 
 type SendAudioRequest struct {
-	InstanceID       string                `param:"instance"`
+	InstanceID       string                `param:"instance" swaggerignore:"true"`
 	Number           string                `json:"number,omitempty"`
 	Audio            string                `json:"audio,omitempty"`
 	Delay            int                   `json:"delay,omitempty" validate:"omitempty,min=0,max=300000"`
@@ -127,7 +127,7 @@ type SendMediaResponse struct {
 }
 
 type SendDocumentRequest struct {
-	InstanceID string `param:"instance"`
+	InstanceID string `param:"instance" swaggerignore:"true"`
 	Number     string `json:"number,omitempty"`
 	Mimetype   string `json:"mimetype,omitempty"`
 	Caption    string `json:"caption,omitempty"`
@@ -173,7 +173,7 @@ type SendDocumentResponseDataImage struct {
 }
 
 type SendReactionRequest struct {
-	InstanceID string `param:"instance" validate:"required"`
+	InstanceID string `param:"instance" validate:"required" swaggerignore:"true"`
 	Reaction   string `json:"reaction,omitempty" validate:"required,len=1"`
 	Key        struct {
 		RemoteJid string `json:"remoteJid,omitempty" validate:"required"`

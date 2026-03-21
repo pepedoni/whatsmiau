@@ -27,6 +27,21 @@ func NewMessages(repository interfaces.InstanceRepository, whatsmiau *whatsmiau.
 	}
 }
 
+// SendText godoc
+// @Summary      Send a text message
+// @Description  Sends a text message to a WhatsApp number via the specified instance
+// @Tags         Message
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string              true  "Instance ID"
+// @Param        body      body      dto.SendTextRequest  true  "Text message parameters"
+// @Success      200       {object}  dto.SendTextResponse
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /instance/{instance}/message/text [post]
+// @Router       /message/sendText/{instance} [post]
 func (s *Message) SendText(ctx echo.Context) error {
 	var request dto.SendTextRequest
 	if err := ctx.Bind(&request); err != nil {
@@ -87,6 +102,21 @@ func (s *Message) SendText(ctx echo.Context) error {
 	})
 }
 
+// SendAudio godoc
+// @Summary      Send an audio message
+// @Description  Sends an audio file (by URL) as a WhatsApp voice message to the specified number
+// @Tags         Message
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string               true  "Instance ID"
+// @Param        body      body      dto.SendAudioRequest  true  "Audio message parameters"
+// @Success      200       {object}  dto.SendAudioResponse
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /instance/{instance}/message/audio [post]
+// @Router       /message/sendWhatsAppAudio/{instance} [post]
 func (s *Message) SendAudio(ctx echo.Context) error {
 	var request dto.SendAudioRequest
 	if err := ctx.Bind(&request); err != nil {
@@ -146,7 +176,20 @@ func (s *Message) SendAudio(ctx echo.Context) error {
 	})
 }
 
-// For evolution compatibility
+// SendMedia godoc
+// @Summary      Send a media message (Evolution API)
+// @Description  Sends a media file (image or document) based on the mediatype field
+// @Tags         Message
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string               true  "Instance ID"
+// @Param        body      body      dto.SendMediaRequest  true  "Media message parameters"
+// @Success      200       {object}  dto.SendDocumentResponse
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /message/sendMedia/{instance} [post]
 func (s *Message) SendMedia(ctx echo.Context) error {
 	var request dto.SendMediaRequest
 	if err := ctx.Bind(&request); err != nil {
@@ -165,6 +208,20 @@ func (s *Message) SendMedia(ctx echo.Context) error {
 	return s.sendDocument(ctx, request.SendDocumentRequest)
 }
 
+// SendDocument godoc
+// @Summary      Send a document
+// @Description  Sends a document file by URL to a WhatsApp number
+// @Tags         Message
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string                  true  "Instance ID"
+// @Param        body      body      dto.SendDocumentRequest  true  "Document parameters"
+// @Success      200       {object}  dto.SendDocumentResponse
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /instance/{instance}/message/document [post]
 func (s *Message) SendDocument(ctx echo.Context) error {
 	var request dto.SendDocumentRequest
 	if err := ctx.Bind(&request); err != nil {
@@ -216,6 +273,20 @@ func (s *Message) sendDocument(ctx echo.Context, request dto.SendDocumentRequest
 	})
 }
 
+// SendImage godoc
+// @Summary      Send an image
+// @Description  Sends an image file by URL to a WhatsApp number
+// @Tags         Message
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string                  true  "Instance ID"
+// @Param        body      body      dto.SendDocumentRequest  true  "Image parameters"
+// @Success      200       {object}  dto.SendDocumentResponse
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /instance/{instance}/message/image [post]
 func (s *Message) SendImage(ctx echo.Context) error {
 	var request dto.SendDocumentRequest
 	if err := ctx.Bind(&request); err != nil {
@@ -266,6 +337,20 @@ func (s *Message) sendImage(ctx echo.Context, request dto.SendDocumentRequest) e
 	})
 }
 
+// SendReaction godoc
+// @Summary      Send a reaction to a message
+// @Description  Sends an emoji reaction to a specific message identified by its key
+// @Tags         Message
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        instance  path      string                   true  "Instance ID"
+// @Param        body      body      dto.SendReactionRequest   true  "Reaction parameters"
+// @Success      200       {object}  dto.SendReactionResponse
+// @Failure      400       {object}  utils.HTTPErrorResponse
+// @Failure      422       {object}  utils.HTTPErrorResponse
+// @Failure      500       {object}  utils.HTTPErrorResponse
+// @Router       /message/sendReaction/{instance} [post]
 func (s *Message) SendReaction(ctx echo.Context) error {
 	var request dto.SendReactionRequest
 	if err := ctx.Bind(&request); err != nil {
