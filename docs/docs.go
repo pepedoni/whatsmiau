@@ -2094,60 +2094,7 @@ const docTemplate = `{
             }
         },
         "dto.CreateInstanceRequest": {
-            "type": "object",
-            "properties": {
-                "alwaysOnline": {
-                    "type": "boolean"
-                },
-                "groupsIgnore": {
-                    "type": "boolean"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "instanceName": {
-                    "type": "string"
-                },
-                "msgCall": {
-                    "type": "string"
-                },
-                "proxyHost": {
-                    "type": "string"
-                },
-                "proxyPassword": {
-                    "type": "string"
-                },
-                "proxyPort": {
-                    "type": "string"
-                },
-                "proxyProtocol": {
-                    "type": "string"
-                },
-                "proxyUsername": {
-                    "type": "string"
-                },
-                "readMessages": {
-                    "type": "boolean"
-                },
-                "readStatus": {
-                    "type": "boolean"
-                },
-                "rejectCall": {
-                    "type": "boolean"
-                },
-                "remoteJID": {
-                    "type": "string"
-                },
-                "syncFullHistory": {
-                    "type": "boolean"
-                },
-                "syncRecentHistory": {
-                    "type": "boolean"
-                },
-                "webhook": {
-                    "$ref": "#/definitions/models.InstanceWebhook"
-                }
-            }
+            "type": "object"
         },
         "dto.CreateInstanceResponse": {
             "type": "object",
@@ -2160,6 +2107,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "migration": {
+                    "$ref": "#/definitions/dto.MigrationResult"
                 },
                 "msgCall": {
                     "type": "string"
@@ -2343,6 +2293,23 @@ const docTemplate = `{
                 },
                 "remoteJid": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.MigrationResult": {
+            "type": "object",
+            "properties": {
+                "connected": {
+                    "type": "boolean"
+                },
+                "jid": {
+                    "type": "string"
+                },
+                "lid": {
+                    "type": "string"
+                },
+                "preKeysImported": {
+                    "type": "integer"
                 }
             }
         },
