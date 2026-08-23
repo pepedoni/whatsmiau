@@ -11,6 +11,8 @@ services:
       - whatsmeow:/app/data
     depends_on:
       - redis
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
     restart: unless-stopped
 
   redis:
