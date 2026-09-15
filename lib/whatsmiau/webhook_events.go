@@ -12,6 +12,7 @@ const (
 	webhookConfigContactsUpsert          webhookConfigEvent = "CONTACTS_UPSERT"
 	webhookConfigGroupParticipantsUpdate webhookConfigEvent = "GROUP_PARTICIPANTS_UPDATE"
 	webhookConfigConnectionUpdate        webhookConfigEvent = "CONNECTION_UPDATE"
+	webhookConfigMessagesEdit            webhookConfigEvent = "MESSAGES_EDIT"
 	webhookConfigCall                    webhookConfigEvent = "CALL"
 )
 
