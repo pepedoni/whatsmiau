@@ -323,7 +323,50 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 				s.handleMessageDeleteEvent(id, instance, e, eventMap)
 				return
 			case waE2E.ProtocolMessage_MESSAGE_EDIT:
-				s.handleMessageEditEvent(id, instance, e, pm, eventMap)
+				pKey := pm.GetKey()
+				if pKey == nil {
+					break
+				}
+				origKey := &WookKey{RemoteJid: pKey.GetRemoteJID(), FromMe: pKey.GetFromMe(), Id: pKey.GetID(), Participant: pKey.GetParticipant()}
+
+				// Newer protocol: actual edit content is secret-encrypted while
+				// ProtocolMessage.EditedMessage may be present but empty.
+				if sec := e.Message.GetSecretEncryptedMessage(); sec != nil && sec.GetSecretEncType() == waE2E.SecretEncryptedMessage_MESSAGE_EDIT {
+					if client, ok := s.clients.Load(id); ok {
+						dctx, dcancel := context.WithTimeout(context.Background(), 10*time.Second)
+						defer dcancel()
+						decrypted, err := client.DecryptSecretEncryptedMessage(dctx, e)
+						if err == nil {
+							s.handleMessageEditEvent(id, instance, e, origKey, decrypted, eventMap)
+							return
+						}
+						zap.L().Warn("decrypt edit secret failed, trying EditedMessage fallback",
+							zap.String("instance", id), zap.Error(err))
+					}
+				}
+
+				if edited := pm.GetEditedMessage(); edited != nil {
+					s.handleMessageEditEvent(id, instance, e, origKey, edited, eventMap)
+					return
+				}
+			}
+		}
+		// Standalone SecretEncryptedMessage edit (no ProtocolMessage wrapper)
+		if sec := e.Message.GetSecretEncryptedMessage(); sec != nil && sec.GetSecretEncType() == waE2E.SecretEncryptedMessage_MESSAGE_EDIT {
+			client, ok := s.clients.Load(id)
+			if !ok {
+				return
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			decrypted, err := client.DecryptSecretEncryptedMessage(ctx, e)
+			if err != nil {
+				zap.L().Error("failed to decrypt edit", zap.String("instance", id), zap.Error(err))
+				return
+			}
+			if targetKey := sec.GetTargetMessageKey(); targetKey != nil {
+				origKey := &WookKey{RemoteJid: targetKey.GetRemoteJID(), FromMe: targetKey.GetFromMe(), Id: targetKey.GetID(), Participant: targetKey.GetParticipant()}
+				s.handleMessageEditEvent(id, instance, e, origKey, decrypted, eventMap)
 				return
 			}
 		}
@@ -426,22 +469,12 @@ func (s *Whatsmiau) handleMessageDeleteEvent(id string, instance *models.Instanc
 	s.emit(wookEvent, instance.Webhook.Url, instance.Webhook.Headers)
 }
 
-func (s *Whatsmiau) handleMessageEditEvent(id string, instance *models.Instance, e *events.Message, pm *waE2E.ProtocolMessage, eventMap map[webhookConfigEvent]bool) {
+func (s *Whatsmiau) handleMessageEditEvent(id string, instance *models.Instance, e *events.Message, originalKey *WookKey, editedMsg *waE2E.Message, eventMap map[webhookConfigEvent]bool) {
 	if !eventMap[webhookConfigMessagesEdit] && !eventMap[webhookConfigMessagesUpsert] {
 		return
 	}
 
 	if canIgnoreGroup(e, instance) {
-		return
-	}
-
-	edited := pm.GetEditedMessage()
-	if edited == nil {
-		return
-	}
-
-	pKey := pm.GetKey()
-	if pKey == nil {
 		return
 	}
 
@@ -451,17 +484,19 @@ func (s *Whatsmiau) handleMessageEditEvent(id string, instance *models.Instance,
 	remoteJid, remoteLid := s.GetJidLid(ctx, id, e.Info.Chat)
 	senderJid, _ := s.GetJidLid(ctx, id, e.Info.Sender)
 
-	originalKey := &WookKey{
-		RemoteJid:   pKey.GetRemoteJID(),
-		FromMe:      pKey.GetFromMe(),
-		Id:          pKey.GetID(),
-		Participant: pKey.GetParticipant(),
-	}
 	if originalKey.RemoteJid == "" {
 		originalKey.RemoteJid = remoteJid
 	}
 
-	messageType, raw, _ := s.parseWAMessage(edited)
+	// Unwrap ProtocolMessage wrapper if the decrypted payload still wraps
+	// the actual content inside ProtocolMessage.EditedMessage.
+	if dpm := editedMsg.GetProtocolMessage(); dpm != nil && dpm.GetType() == waE2E.ProtocolMessage_MESSAGE_EDIT {
+		if inner := dpm.GetEditedMessage(); inner != nil {
+			editedMsg = inner
+		}
+	}
+
+	messageType, raw, _ := s.parseWAMessage(editedMsg)
 
 	editData := &WookMessageEditData{
 		Key:           originalKey,
